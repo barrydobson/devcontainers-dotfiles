@@ -45,3 +45,5 @@ alias pig="pip install -g"
 
 # cargo
 alias ci="cargo install"
+
+alias la="ls -la"                 # List all files with details
