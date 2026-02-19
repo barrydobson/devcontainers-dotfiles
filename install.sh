@@ -187,12 +187,22 @@ post_install_setup() {
         print_status "Attempting to change default shell to zsh..."
         local zsh_path
         zsh_path=$(command -v zsh)
-        if chsh -s "${zsh_path}" 2>/dev/null; then
-            print_success "Default shell changed to zsh (restart required)"
+        if check_sudo_access; then
+            if sudo chsh -s "${zsh_path}" 2>/dev/null; then
+                print_success "Default shell changed to zsh (restart required)"
+            else
+                print_warning "Could not change default shell automatically (requires authentication)"
+                print_warning "To change shell manually, run: chsh -s ${zsh_path}"
+            fi
         else
-            print_warning "Could not change default shell automatically (requires authentication)"
-            print_warning "To change shell manually, run: chsh -s ${zsh_path}"
+            if chsh -s "${zsh_path}" 2>/dev/null; then
+                print_success "Default shell changed to zsh (restart required)"
+            else
+                print_warning "Could not change default shell automatically (requires authentication)"
+                print_warning "To change shell manually, run: chsh -s ${zsh_path}"
+            fi
         fi
+        
     else
         print_status "Default shell is already zsh"
     fi
