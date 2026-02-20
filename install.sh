@@ -200,7 +200,6 @@ setup_user() {
   op_get bd id_ed25519_github publicKey > $MYHOME/.ssh/id_ed25519.pub
   ssh-keyscan -p 22 -H github.com gist.github.com > /root/.ssh/known_hosts
   ssh-keyscan -p 22 -H github.com gist.github.com > $MYHOME/.ssh/known_hosts
-  # chown -R $ME:$ME /home/$ME/.ssh
   chmod 700 $MYHOME/.ssh
   chmod 600 $MYHOME/.ssh/*
 
