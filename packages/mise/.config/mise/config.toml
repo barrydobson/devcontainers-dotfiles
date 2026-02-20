@@ -1,0 +1,15 @@
+[tools]
+bat = "latest"
+bat-extras = "latest"
+claude = "latest"
+delta = "latest"
+eza = "latest"
+fzf = "latest"
+jq = "latest"
+gh = "latest"
+node = "22"
+"aqua:mikefarah/yq" = "latest"
+
+[settings]
+experimental = true
+lockfile = true

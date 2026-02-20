@@ -1,23 +1,22 @@
-# shellcheck disable=all
+# regenerate ~/.zautocomp to include ~/.zsh/functions
+if [[ -d "${ZDOTDIR}/functions" ]]; then
+  # Expand fpath to include ~/.zsh/functions
+  fpath=( "${ZDOTDIR}/functions" $fpath )
 
-#=============================================================================
-# Zsh Configuration - Modular Setup
-#=============================================================================
-#
-# Configuration is split into focused files in conf.d/:
-# - environment.zsh : Environment variables, PATH, history
-# - plugins.zsh     : Zinit and plugin management
-# - completion.zsh  : Completion system and setup
-# - tools.zsh       : Tool initialization (starship, VSCode integration)
-#
-# Aliases are in aliases/*.zsh (sourced from tools.zsh)
-#=============================================================================
+  autoload -Uz compinit
+  compinit
+fi
 
-# Source configuration files in order
-if [[ -d $ZDOTDIR/conf.d ]]; then
-    # Load in specific order for dependencies
-    source "$ZDOTDIR/conf.d/environment.zsh"
-    source "$ZDOTDIR/conf.d/plugins.zsh"
-    source "$ZDOTDIR/conf.d/completion.zsh"
-    source "$ZDOTDIR/conf.d/tools.zsh"
+# source configs in .zsh/configs
+if [[ -d "${ZDOTDIR}/configs" ]]; then
+  for config in ${ZDOTDIR}/configs/*.zsh; do
+    source $config
+  done
+fi
+
+# source aliases in .zsh/aliases
+if [[ -d "${ZDOTDIR}/aliases" ]]; then
+  for alias in ${ZDOTDIR}/aliases/*.zsh; do
+    source $alias
+  done
 fi
