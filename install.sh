@@ -4,6 +4,10 @@
 # Devcontainer Dotfiles Installation Script (Ubuntu/Debian)
 # =============================================================================
 # Minimal installation for devcontainer environments: zsh, stow, zinit, starship
+#
+# usage:
+# curl -L https://raw.githubusercontent.com/barrydobson/devcontainers-dotfiles/main/install.sh > x && chmod +x x && sudo ./x
+# make sure your edit the ARCH var for your architecture
 
 set -e  # Exit on any error
 
@@ -13,6 +17,14 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+export ME='bd'
+export X_UID=10806
+export ARCH='x86' # arm, x86
+
+# script vars
+MYHOME="$HOME"
+PKGARCH=$ARCH
 
 # Helper functions
 print_status() {
@@ -31,6 +43,34 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+op_get() {
+	f="${3:-notesPlain}"
+	op item get "$2" --account "$1" --fields "$f" --format json --vault dotfiles | jq -rM '.value'
+}
+
+op_getfile() {
+	f="${4:-notesPlain}"
+	op --account "$1" read "op://$2/$3/$f"
+}
+
+op_account() {
+	domain="${3:-my}.1password.eu"
+	op account add \
+		--address "$domain" \
+		--email "$2" \
+		--shorthand "$1"
+}
+
+_sudo() {
+    if check_sudo_access; then
+        sudo "$@"
+    elif [[ $EUID -eq 0 ]]; then
+        "$@"
+    else
+        print_warning "Sudo access not available, running command without sudo: $*"
+        "$@"
+    fi
+}
 
 # Check if we can run sudo without password
 check_sudo_access() {
@@ -66,54 +106,41 @@ check_debian_based() {
     fi
 }
 
-# Update package lists only (no upgrade in containers)
-update_system() {
-    print_status "Updating package lists..."
-    if check_sudo_access; then
-        sudo apt update
-        print_success "Package lists updated"
-    else
-        print_warning "Cannot update package lists automatically"
-        print_warning "Please run: sudo apt update"
-    fi
+add_apt_sources() {
+  print_status "Adding additional APT sources for latest packages..."
+
+  # GitHub CLI
+  curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg &&
+	chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg &&
+	echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+  # 1Password CLI
+  curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg &&
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | tee /etc/apt/sources.list.d/1password.list > /dev/null
+  mkdir -p /etc/debsig/policies/AC2D62742012EA22/ &&
+    curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol | tee /etc/debsig/policies/AC2D62742012EA22/1password.pol
+  mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 &&
+    curl -sS https://downloads.1password.com/linux/keys/1password.asc | gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
+}
+
+install_runtime_packages() {
+  apt update && apt install -y git gpg bash curl gnupg
 }
 
 # Install minimal packages for devcontainer
 install_official_packages() {
     print_status "Installing minimal packages for devcontainer..."
 
-    local packages=(
-        "zsh"                # Z shell
-        "make"               # Build tool (requested)
-        "stow"               # Symlink farm manager
-        "git"                # Version control
-        "curl"               # HTTP client
-        "unzip"              # Archive tool (for starship install)
-    )
-
-    local all_packages=("${packages[@]}")
-
-    # Install packages
-    if check_sudo_access; then
-        for package in "${all_packages[@]}"; do
-            if dpkg -l | grep -q "^ii  ${package} "; then
-                print_status "${package} is already installed"
-            else
-                print_status "Installing ${package}..."
-                if ! sudo apt install -y "${package}" 2>/dev/null; then
-                    print_warning "Failed to install ${package}, it may not be available in repositories"
-                fi
-            fi
-        done
-    else
-        print_warning "Cannot install packages automatically"
-        print_warning "Please run the following commands manually:"
-        for package in "${all_packages[@]}"; do
-            if ! dpkg -l | grep -q "^ii  ${package} "; then
-                echo "sudo apt install -y ${package}"
-            fi
-        done
-    fi
+    apt update &&
+	    DEBIAN_FRONTEND=noninteractive apt install -y \
+        1password-cli \
+        make \
+        gh \
+        gpg-agent \
+        jq \
+        stow \
+        unzip \
+        zsh
 
     print_success "Official packages installation completed"
 }
@@ -122,7 +149,7 @@ install_official_packages() {
 install_zinit() {
     print_status "Installing Zinit (Zsh plugin manager)..."
 
-    local zinit_home="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
+    local zinit_home="${MYHOME}/.local/share/zinit/zinit.git"
 
     if [[ ! -d "${zinit_home}" ]]; then
         mkdir -p "$(dirname "${zinit_home}")"
@@ -137,11 +164,46 @@ install_starship() {
     print_status "Installing Starship prompt..."
 
     if ! command -v starship >/dev/null 2>&1; then
-        curl -sS https://starship.rs/install.sh | sh -s -- -y
+        print_status "$(uname -s)-$(uname -m) architecture detected, installing appropriate Starship binary..."
+        curl -sS https://starship.rs/install.sh | sh -s -- -y -a "$(uname -m)"
         print_success "Starship installed"
     else
         print_status "Starship is already installed"
     fi
+}
+
+setup_dotfiles() {
+    print_status "Setting up dotfiles..."
+
+    git clone https://github.com/barrydobson/devcontainers-dotfiles.git $MYHOME/.local/src/dotfiles &&
+    cd $MYHOME/.local/src/dotfiles &&
+    stow_packages $MYHOME
+
+    print_success "Dotfiles setup completed"
+}
+
+setup_user() {
+
+  print_status "Setting up 1Password CLI account"
+  op_account bd
+  eval "$(op signin --account bd)"
+
+  print_status "setting up key keychain"
+  op_get bd GH_TOKEN token | gh auth login --with-token
+  mkdir -p $MYHOME/.ssh
+
+  if [[ -d /home/root/.ssh ]]; then
+    cp /root/.ssh/authorized_keys $MYHOME/.ssh/authorized_keys
+  fi
+
+  op_get bd id_ed25519_github privateKey > $MYHOME/.ssh/id_ed25519
+  op_get bd id_ed25519_github publicKey > $MYHOME/.ssh/id_ed25519.pub
+  ssh-keyscan -p 22 -H github.com gist.github.com > /root/.ssh/known_hosts
+  ssh-keyscan -p 22 -H github.com gist.github.com > $MYHOME/.ssh/known_hosts
+  # chown -R $ME:$ME /home/$ME/.ssh
+  chmod 700 $MYHOME/.ssh
+  chmod 600 $MYHOME/.ssh/*
+
 }
 
 
@@ -149,17 +211,13 @@ install_starship() {
 stow_packages() {
     print_status "Setting up dotfiles symlinks with stow..."
 
-    local script_dir
-    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local dotfiles_root="${script_dir}"
-    local packages_dir="${dotfiles_root}/packages"
+    local packages_dir="./packages"
+    local target_dir="${1}"
 
     if [[ ! -d "${packages_dir}" ]]; then
         print_error "Packages directory not found at ${packages_dir}"
         return 1
     fi
-
-    cd "${dotfiles_root}"
 
     # Stow each package
     for package in "${packages_dir}"/*; do
@@ -167,7 +225,7 @@ stow_packages() {
             local package_name
             package_name=$(basename "${package}")
             print_status "Stowing ${package_name}..."
-            if stow -d packages -t "${HOME}" "${package_name}" 2>/dev/null; then
+            if stow -d packages -t "${target_dir}" "${package_name}" 2>/dev/null; then
                 print_success "${package_name} stowed"
             else
                 print_warning "Failed to stow ${package_name} (may already be stowed)"
@@ -187,30 +245,30 @@ post_install_setup() {
         print_status "Attempting to change default shell to zsh..."
         local zsh_path
         zsh_path=$(command -v zsh)
-        if check_sudo_access; then
-            if sudo chsh -s "${zsh_path}" 2>/dev/null; then
-                print_success "Default shell changed to zsh (restart required)"
-            else
-                print_warning "Could not change default shell automatically (requires authentication)"
-                print_warning "To change shell manually, run: chsh -s ${zsh_path}"
-            fi
+        if _sudo chsh -s "${zsh_path}" 2>/dev/null; then
+            print_success "Default shell changed to zsh (restart required)"
         else
-            if chsh -s "${zsh_path}" 2>/dev/null; then
-                print_success "Default shell changed to zsh (restart required)"
-            else
-                print_warning "Could not change default shell automatically (requires authentication)"
-                print_warning "To change shell manually, run: chsh -s ${zsh_path}"
-            fi
+            print_warning "Could not change default shell automatically (requires authentication)"
+            print_warning "To change shell manually, run: chsh -s ${zsh_path}"
         fi
-        
+
+
     else
         print_status "Default shell is already zsh"
     fi
 
     # Create necessary directories
-    mkdir -p "${HOME}/.local/bin"
-    mkdir -p "${HOME}/.local/share"
-    mkdir -p "${HOME}/.config"
+    mkdir -p \
+      ${MYHOME}/.{config,local} \
+      ${MYHOME}/.local/{bin,share}
+
+    print_status "getting git config from 1Password CLI..."
+    op_getfile bd dotfiles gitconfig > $MYHOME/.config/git/.gitconfig-local
+
+    print_status "Cleaning up 1Password CLI account information..."
+    op signout --account bd --forget
+
+    rm $MYHOME/.profile $MYHOME/.bash*
 
     print_success "Post-installation setup completed"
 }
@@ -223,17 +281,21 @@ main() {
     check_debian_based
 
     # Update system
-    update_system
+    install_runtime_packages
+    add_apt_sources
 
     # Install packages
     install_official_packages
+
+    # Setup user and 1Password CLI
+    setup_user
 
     # Install shell tools
     install_zinit
     install_starship
 
     # Stow dotfiles
-    stow_packages
+    setup_dotfiles
 
     # Post-installation setup
     post_install_setup
