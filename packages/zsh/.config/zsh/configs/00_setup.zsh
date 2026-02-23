@@ -8,6 +8,7 @@ set_environment() {
   export SSH_DATA_HOME="$XDG_DATA_HOME/ssh"
   export LANG=en_GB.UTF-8
   export LC_ALL="en_GB.UTF-8"
+  export STARSHIP_CONFIG="${HOME}/.config/starship/starship.toml"
 }
 
 set_bindings() {
@@ -95,6 +96,7 @@ set_dircolors() {
   [ -x /usr/bin/dircolors ] && eval "$(dircolors -b)"
 }
 
+set_environment
 set_bindings
 set_completion
 set_history
