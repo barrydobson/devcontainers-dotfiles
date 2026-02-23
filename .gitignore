@@ -28,3 +28,5 @@ packages/zsh/.config/zsh/.zsh_history
 packages/zsh/.config/zsh/.zprofile
 
 .claude/settings.local.json
+.zcompdump
+.env
