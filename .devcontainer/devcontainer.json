@@ -9,9 +9,9 @@
       "installDirectlyFromGitHubRelease": true,
       "version": "latest"
     }
-  },
+  }
 
-  "postCreateCommand": "sudo apt-get update; sudo apt-get install -y --no-install-recommends stow"
+  // "postCreateCommand": "sudo apt-get update; sudo apt-get install -y --no-install-recommends stow"
 
   // Features to add to the dev container. More info: https://containers.dev/features.
   // "features": {},
