@@ -163,7 +163,7 @@ sh ./install.d/mise
 
 install_runtime_packages
 
-install_1password_cli
+# install_1password_cli
 
 stow_packages
 
