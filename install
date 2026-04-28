@@ -156,7 +156,7 @@ print_status "Installing zoxide..."
 sh ./install.d/zoxide
 
 print_status "Installing starship prompt..."
-sh ./install.d/starship --yes
+sh ./install.d/starship --yes -b $HOME/.local/bin
 
 print_status "Installing mise..."
 sh ./install.d/mise
